@@ -94,17 +94,18 @@ def add_user(user, allowed_ip):
         f.write(client_config)
 
     img = qrcode.make(client_config)
-    qr_path = f"{USER_DIR}/{user}.png"
-    img.save(qr_path)
-    print(f"Пользователь {user} добавлен. QR код сохранен в {qr_path}")
+    img.save(f"{USER_DIR}/{user}.png")
+    print(f"Пользователь {user} добавлен. QR код сохранен в {USER_DIR}/{user}.png")
 
-    # Попытаться открыть изображение с помощью Pillow
-    try:
-        img.show()  # Это работает, если Pillow поддерживает отображение в вашей среде
-    except Exception as e:
-        print(f"Не удалось открыть QR код автоматически: {e}")
+    # Вывод QR-кода в консоль
+    qr_terminal(client_config)
 
     run_command("systemctl restart wg-quick@wg0")
+
+
+def qr_terminal(data):
+    import qrcode_terminal
+    qrcode_terminal.draw(data)
 
 def remove_user(user):
     run_command(f"sed -i '/# {user} start/,/# {user} end/d' {WG_CONFIG}")
