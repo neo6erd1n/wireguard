@@ -2,7 +2,10 @@
 
 ------------------------------
 # Установка
-
+mkdir /etc/create_wireguard
+cd /etc/create_wireguard
+git clone https://github.com/neo6erd1n/wireguard.git
+cd /etc/create_wireguard/wireguard/src
 ------------------------------
 Добавление пользователя
 python3 wireguard_manager.py add --user <имя_пользователя> --ip <разрешенный_IP>
