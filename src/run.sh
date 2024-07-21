@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo mkdir -p /etc/wireguard/users/
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip python3.12-venv wireguard
 python3 -m venv venv
