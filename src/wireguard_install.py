@@ -68,6 +68,12 @@ def generate_server_keys():
 
 def add_user(user, allowed_ip):
     private_key, public_key = generate_keys(user)
+
+    # Убедитесь, что ключи сервера существуют
+    if not os.path.exists(SERVER_PUBLIC_KEY):
+        raise Exception(f"Файл с публичным ключом сервера не найден: {SERVER_PUBLIC_KEY}")
+
+    # Добавление пользователя в конфигурацию
     with open(WG_CONFIG, 'a') as config:
         config.write(f"\n[Peer]\nPublicKey = {public_key}\nAllowedIPs = {allowed_ip}\n")
 
@@ -139,6 +145,7 @@ if __name__ == "__main__":
         if not args.user or not args.ip:
             print("Для добавления пользователя необходимо указать имя и IP-адрес")
         else:
+            generate_server_keys()  # Генерируем ключи сервера перед добавлением пользователя
             add_user(args.user, args.ip)
     elif args.action == 'remove':
         if not args.user:
