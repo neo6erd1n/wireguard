@@ -25,7 +25,7 @@ def generate_keys(user):
 
 def get_network_interface():
     output = run_command("ip -o -4 route show to default").strip()
-    interface = output.split()[-1]
+    interface = output.split()[-2]
     return interface
 
 
@@ -69,11 +69,9 @@ def generate_server_keys():
 def add_user(user, allowed_ip):
     private_key, public_key = generate_keys(user)
 
-    # Убедитесь, что ключи сервера существуют
     if not os.path.exists(SERVER_PUBLIC_KEY):
         raise Exception(f"Файл с публичным ключом сервера не найден: {SERVER_PUBLIC_KEY}")
 
-    # Добавление пользователя в конфигурацию
     with open(WG_CONFIG, 'a') as config:
         config.write(f"\n[Peer]\nPublicKey = {public_key}\nAllowedIPs = {allowed_ip}\n")
 
@@ -90,20 +88,23 @@ def add_user(user, allowed_ip):
     Endpoint = {external_ip}:51820
     AllowedIPs = 0.0.0.0/0
     PersistentKeepalive = 20
-    """
-    client_config = client_config.strip()
+    """.strip()
+
     with open(f"{USER_DIR}/{user}.conf", 'w') as f:
         f.write(client_config)
 
     img = qrcode.make(client_config)
-    img.save(f"{USER_DIR}/{user}.png")
-    print(f"Пользователь {user} добавлен. QR код сохранен в {USER_DIR}/{user}.png")
+    qr_path = f"{USER_DIR}/{user}.png"
+    img.save(qr_path)
+    print(f"Пользователь {user} добавлен. QR код сохранен в {qr_path}")
 
-    # Открытие QR-кода в терминале
-    img.show()
+    # Попытаться открыть изображение с помощью Pillow
+    try:
+        img.show()  # Это работает, если Pillow поддерживает отображение в вашей среде
+    except Exception as e:
+        print(f"Не удалось открыть QR код автоматически: {e}")
 
     run_command("systemctl restart wg-quick@wg0")
-
 
 def remove_user(user):
     run_command(f"sed -i '/# {user} start/,/# {user} end/d' {WG_CONFIG}")
