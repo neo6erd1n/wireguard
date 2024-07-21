@@ -23,14 +23,10 @@ def generate_keys(user):
     return private_key, public_key
 
 
-def generate_server_keys():
-    if not os.path.exists(SERVER_PRIVATE_KEY) or not os.path.exists(SERVER_PUBLIC_KEY):
-        print("Серверные ключи не найдены, создаем новые...")
-        private_key = run_command(f"wg genkey | tee {SERVER_PRIVATE_KEY}").strip()
-        public_key = run_command(f"cat {SERVER_PRIVATE_KEY} | wg pubkey | tee {SERVER_PUBLIC_KEY}").strip()
-        print(f"Серверные ключи созданы:\nPrivateKey: {private_key}\nPublicKey: {public_key}")
-    else:
-        print("Серверные ключи уже существуют.")
+def get_network_interface():
+    output = run_command("ip -o -4 route show to default").strip()
+    interface = output.split()[-1]
+    return interface
 
 
 def get_external_ip():
@@ -43,13 +39,40 @@ def get_external_ip():
         raise Exception(f"Ошибка получения внешнего IP-адреса: {str(e)}")
 
 
+def generate_server_keys():
+    if not os.path.exists(SERVER_PRIVATE_KEY) or not os.path.exists(SERVER_PUBLIC_KEY):
+        print("Серверные ключи не найдены, создаем новые...")
+        private_key = run_command(f"wg genkey | tee {SERVER_PRIVATE_KEY}").strip()
+        public_key = run_command(f"cat {SERVER_PRIVATE_KEY} | wg pubkey | tee {SERVER_PUBLIC_KEY}").strip()
+
+        # Получение интерфейса и создание конфигурации
+        network_interface = get_network_interface()
+        allowed_subnet = "10.0.0.0/24"  # Здесь укажите разрешенную подсеть
+
+        config_content = f"""
+        [Interface]
+        PrivateKey = {private_key}
+        Address = {allowed_subnet}
+        ListenPort = 51820
+        PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o {network_interface} -j MASQUERADE
+        PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o {network_interface} -j MASQUERADE
+        """
+
+        with open(WG_CONFIG, 'w') as config_file:
+            config_file.write(config_content.strip())
+
+        print("Серверные ключи созданы и конфигурация обновлена.")
+    else:
+        print("Серверные ключи уже существуют.")
+
+
 def add_user(user, allowed_ip):
-    generate_server_keys()
     private_key, public_key = generate_keys(user)
     with open(WG_CONFIG, 'a') as config:
         config.write(f"\n[Peer]\nPublicKey = {public_key}\nAllowedIPs = {allowed_ip}\n")
 
     external_ip = get_external_ip()
+
     client_config = f"""
     [Interface]
     PrivateKey = {private_key}
@@ -63,24 +86,17 @@ def add_user(user, allowed_ip):
     PersistentKeepalive = 20
     """
     client_config = client_config.strip()
-
     with open(f"{USER_DIR}/{user}.conf", 'w') as f:
         f.write(client_config)
 
-    # Генерация и сохранение QR-кода
     img = qrcode.make(client_config)
     img.save(f"{USER_DIR}/{user}.png")
     print(f"Пользователь {user} добавлен. QR код сохранен в {USER_DIR}/{user}.png")
 
-    # Вывод QR-кода в консоль
-    qr_terminal(client_config)
+    # Открытие QR-кода в терминале
+    img.show()
 
     run_command("systemctl restart wg-quick@wg0")
-
-
-def qr_terminal(data):
-    import qrcode_terminal
-    qrcode_terminal.draw(data)
 
 
 def remove_user(user):
