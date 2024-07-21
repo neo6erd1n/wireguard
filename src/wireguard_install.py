@@ -1,6 +1,7 @@
 import subprocess
 import os
 import qrcode
+from PIL import Image
 
 WG_DIR = "/etc/wireguard"
 WG_CONFIG = f"{WG_DIR}/wg0.conf"
@@ -61,13 +62,25 @@ def add_user(user, allowed_ip):
     AllowedIPs = 0.0.0.0/0
     PersistentKeepalive = 20
     """
+    client_config = client_config.strip()
+
     with open(f"{USER_DIR}/{user}.conf", 'w') as f:
         f.write(client_config)
 
+    # Генерация и сохранение QR-кода
     img = qrcode.make(client_config)
     img.save(f"{USER_DIR}/{user}.png")
     print(f"Пользователь {user} добавлен. QR код сохранен в {USER_DIR}/{user}.png")
+
+    # Вывод QR-кода в консоль
+    qr_terminal(client_config)
+
     run_command("systemctl restart wg-quick@wg0")
+
+
+def qr_terminal(data):
+    import qrcode_terminal
+    qrcode_terminal.draw(data)
 
 
 def remove_user(user):
