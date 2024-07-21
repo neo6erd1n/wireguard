@@ -8,16 +8,19 @@ USER_DIR = f"{WG_DIR}/users"
 SERVER_PRIVATE_KEY = f"{WG_DIR}/server_privatekey"
 SERVER_PUBLIC_KEY = f"{WG_DIR}/server_publickey"
 
+
 def run_command(command):
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode != 0:
         raise Exception(f"Ошибка выполнения команды: {command}\n{result.stderr.decode()}")
     return result.stdout.decode()
 
+
 def generate_keys(user):
     private_key = run_command(f"wg genkey | tee {USER_DIR}/{user}_privatekey").strip()
     public_key = run_command(f"cat {USER_DIR}/{user}_privatekey | wg pubkey | tee {USER_DIR}/{user}_publickey").strip()
     return private_key, public_key
+
 
 def generate_server_keys():
     if not os.path.exists(SERVER_PRIVATE_KEY) or not os.path.exists(SERVER_PUBLIC_KEY):
@@ -28,12 +31,24 @@ def generate_server_keys():
     else:
         print("Серверные ключи уже существуют.")
 
+
+def get_external_ip():
+    try:
+        ip = run_command("curl -s ifconfig.me").strip()
+        if not ip:
+            raise Exception("Не удалось получить внешний IP-адрес")
+        return ip
+    except Exception as e:
+        raise Exception(f"Ошибка получения внешнего IP-адреса: {str(e)}")
+
+
 def add_user(user, allowed_ip):
     generate_server_keys()
     private_key, public_key = generate_keys(user)
     with open(WG_CONFIG, 'a') as config:
         config.write(f"\n[Peer]\nPublicKey = {public_key}\nAllowedIPs = {allowed_ip}\n")
 
+    external_ip = get_external_ip()
     client_config = f"""
     [Interface]
     PrivateKey = {private_key}
@@ -42,7 +57,7 @@ def add_user(user, allowed_ip):
 
     [Peer]
     PublicKey = {run_command(f'cat {SERVER_PUBLIC_KEY}').strip()}
-    Endpoint = <ВАШ_IP_СЕРВЕРА>:51820
+    Endpoint = {external_ip}:51820
     AllowedIPs = 0.0.0.0/0
     PersistentKeepalive = 20
     """
@@ -54,6 +69,7 @@ def add_user(user, allowed_ip):
     print(f"Пользователь {user} добавлен. QR код сохранен в {USER_DIR}/{user}.png")
     run_command("systemctl restart wg-quick@wg0")
 
+
 def remove_user(user):
     run_command(f"sed -i '/# {user} start/,/# {user} end/d' {WG_CONFIG}")
     run_command("systemctl restart wg-quick@wg0")
@@ -63,12 +79,14 @@ def remove_user(user):
     os.remove(f"{USER_DIR}/{user}.png")
     print(f"Пользователь {user} удален")
 
+
 def list_users():
     with open(WG_CONFIG, 'r') as f:
         lines = f.readlines()
     for line in lines:
         if line.strip().startswith("[Peer]"):
             print(line.strip())
+
 
 def remove_wireguard():
     run_command("systemctl stop wg-quick@wg0")
@@ -77,6 +95,7 @@ def remove_wireguard():
     os.remove(WG_CONFIG)
     os.rmdir(WG_DIR)
     print("WireGuard удален с сервера")
+
 
 if __name__ == "__main__":
     import argparse
