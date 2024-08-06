@@ -6,4 +6,4 @@ python3 -m venv venv
 source venv/bin/activate
 pip install qrcode
 pip install qrcode[pil] qrcode_terminal
-python3 wireguard_install.py add --user test --ip 10.10.10.6
+python3 wireguard_install.py
